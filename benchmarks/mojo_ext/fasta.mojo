@@ -1,8 +1,12 @@
-# Fasta benchmark in Mojo
-# Ported from the Computer Language Benchmarks Game
-# Rewritten for Mojo 1.0 syntax
+# Fasta benchmark as a Python-callable Mojo extension module.
+# Exposes two integration patterns:
+#   1. compute(n)            - PythonObject boundary ("python objects")
+#   2. Sim(n).run(n)         - native Mojo struct exposed to Python ("native objects")
+# Built with: mojo build --emit shared-lib fasta.mojo -o fasta.so
 
-from std.sys import argv
+from std.os import abort
+from std.python import Python, PythonObject
+from std.python.bindings import PythonModuleBuilder
 
 
 struct RNGState:
@@ -12,24 +16,12 @@ struct RNGState:
         self.seed = seed
 
 
-@always_inline("nodebug")
 def lcg_next(mut state: RNGState) -> Float64:
     var ia: Int = 3877
     var ic: Int = 29573
     var im: Int = 139968
     state.seed = (state.seed * ia + ic) % im
     return Float64(state.seed) / Float64(im)
-
-
-def make_cumulative(table: List[Tuple[String, Float64]]) -> Tuple[List[Float64], List[String]]:
-    var P = List[Float64]()
-    var C = List[String]()
-    var prob: Float64 = 0.0
-    for (char, p) in table:
-        prob += p
-        P.append(prob)
-        C.append(char)
-    return (P^, C^)
 
 
 def pick_char(probs: List[Float64], chars: List[String], r: Float64) -> String:
@@ -88,8 +80,8 @@ def random_fasta(table: List[Tuple[String, Float64]], n: Int, mut rng: RNGState)
     return "\n".join(output)
 
 
-def run(n: Int) raises -> String:
-    var rng = RNGState(42)
+def run_fasta(n: Int, seed: Int) raises -> String:
+    var rng = RNGState(seed)
 
     var alu = (
         "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGG"
@@ -126,9 +118,41 @@ def run(n: Int) raises -> String:
     return "\n".join(output)
 
 
-def main() raises:
-    var n = 1000
-    var a = argv()
-    if len(a) > 1:
-        n = Int(a[1])
-    print(run(n))
+def compute(n: PythonObject) raises -> PythonObject:
+    var ni = Int(py=n)
+    return PythonObject(run_fasta(ni, 42))
+
+
+@fieldwise_init
+struct Sim(Defaultable, Movable, Writable):
+    var seed: Int
+
+    def __init__(out self):
+        self.seed = 42
+
+    @staticmethod
+    def py_init(out self: Sim, args: PythonObject, kwargs: PythonObject) raises:
+        if len(args) > 0:
+            self = Sim(Int(py=args[0]))
+        else:
+            self = Sim()
+
+    @staticmethod
+    def run(self_ptr: Pointer[Sim, MutAnyOrigin], n: PythonObject) raises -> PythonObject:
+        var ni = Int(py=n)
+        return PythonObject(run_fasta(ni, self_ptr[].seed))
+
+
+@export
+def PyInit_fasta() abi("C") -> PythonObject:
+    try:
+        var m = PythonModuleBuilder("fasta")
+        m.def_function[compute]("compute")
+        _ = (
+            m.add_type[Sim]("Sim")
+            .def_py_init[Sim.py_init]()
+            .def_method[Sim.run]("run")
+        )
+        return m.finalize()
+    except e:
+        abort(String("failed to create module: ", e))
