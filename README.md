@@ -83,13 +83,11 @@ uv run python benchmarks/verify.py
 
 ### Output table
 
-```
-Benchmark          Python       Mojo  py->mojo(py) py->mojo(nat)   Mojo/Py   py/obj   py/nat Status
-----------------------------------------------------------------------------------------------------------------------
-spectral_norm     16.44      0.602       0.167         0.161        27.29x   98.50x  101.94x OK
-nbody              0.319      0.488       0.0036        0.0034        0.65x   88.90x   93.38x OK
-...
-```
+| Benchmark   | Python  | Mojo    | py->mojo(py) | py->mojo(nat) | Mojo/Py | py/obj | py/nat | Status |
+| ----------- | ------- | ------- | ------------ | ------------- | ------- | ------ | ------ | ------ |
+| spectral_norm | 16.44 | 0.602   | 0.167        | 0.161         | 27.29x  | 98.50x | 101.94x | OK |
+| nbody       | 0.319   | 0.488   | 0.0036       | 0.0034        | 0.65x   | 88.90x | 93.38x  | OK |
+| ...         | ...     | ...     | ...          | ...           | ...     | ...    | ...     | ... |
 
 - Times are the **median** of timed runs (seconds; lower is better).
 - `Mojo/Py` = Python time / Mojo time. `py/obj` and `py/nat` = Python time /
